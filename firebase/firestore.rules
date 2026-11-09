@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Roles come from custom claims set only by the Admin SDK (never from a document the user can edit).
+    function signedIn() { return request.auth != null; }
+    function role() { return signedIn() ? request.auth.token.get('role', '') : ''; }
+    function isStaff() { return role() in ['super_admin', 'content_manager', 'content_editor', 'viewer']; }
+    function isSuper() { return role() == 'super_admin'; }
+    function canSeeInquiries() { return role() in ['super_admin', 'content_manager']; }
+    function isPublished() { return resource.data.get('status', '') == 'published'; }
+
+    // Public content: visitors read published records only; staff also read drafts.
+    // ALL client writes are denied. Every write goes through server routes using the Admin SDK,
+    // which validates input, enforces permissions and writes the audit log.
+    match /{col}/{id} {
+      allow read: if col in ['articles', 'exhibitions', 'artifacts', 'educationalResources'] && (isPublished() || isStaff());
+      allow write: if false;
+    }
+    match /{col}/{id} {
+      allow read: if col in ['articleCategories', 'artifactCategories', 'pages'] ;
+      allow write: if false;
+    }
+
+    match /settings/site { allow read: if true; allow write: if false; }          // public site info only
+    match /settings/{doc} { allow read: if isSuper(); allow write: if false; }    // anything else is Super Admin only
+
+    match /inquiries/{id}             { allow read: if canSeeInquiries(); allow write: if false; }
+    match /newsletterSubscribers/{id} { allow read: if canSeeInquiries(); allow write: if false; }
+    match /media/{id}                 { allow read: if isStaff(); allow write: if false; }
+    match /users/{uid}                { allow read: if isSuper() || (signedIn() && request.auth.uid == uid); allow write: if false; }
+    match /activityLogs/{id}          { allow read: if isSuper(); allow write: if false; }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}

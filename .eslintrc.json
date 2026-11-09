@@ -1,0 +1,4 @@
+{
+  "extends": ["next/core-web-vitals", "next/typescript"],
+  "overrides": [{ "files": ["src/components/admin/**"], "rules": { "@next/next/no-img-element": "off" } }]
+}

@@ -1,0 +1,10 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Only files intentionally placed under public/ can be read without signing in.
+    match /public/{allPaths=**} { allow read: if true; allow write: if false; }
+    // Uploads happen through short-lived signed URLs issued by the server after it validates
+    // type and size (Phase 4), so clients never write directly. Everything else is private.
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}
